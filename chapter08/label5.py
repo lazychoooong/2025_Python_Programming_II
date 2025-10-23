@@ -14,6 +14,6 @@ message = """삶이 그대를 속일지라도
 """
 
 w2 = Label(root,
-           padx = 10,
+           padx = 10, # padx = 여백
            text = message).pack(side = "left")
 root.mainloop()
