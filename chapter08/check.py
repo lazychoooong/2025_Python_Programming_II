@@ -2,6 +2,8 @@ from tkinter import *
 
 root = Tk()
 Label(root, text = "선호하는 언어를 모두 선택하시오 : ").grid(row = 0, sticky = W)
+# grid : 격자 배치 방식 (행(row)/열(column) 지정해 테이블처럼 배치)
+# sticky : 위젯을 셀 안에서 어느 방향으로 붙일지.. (radio 예제의 anchor와 비슷)
 
 value1 = IntVar()
 Checkbutton(root, text = "Python", variable = value1).grid(row = 1, sticky = W)

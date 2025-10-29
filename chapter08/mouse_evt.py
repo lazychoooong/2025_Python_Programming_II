@@ -9,8 +9,8 @@ def right_click(event):
 root = Tk()
 
 frame = Frame(root, width = 200, height = 200)
-frame.bind("<Button-1>", left_click)
-frame.bind("<Button-3>", right_click)
+frame.bind("<Button-1>", left_click)    # 왼쪽 버튼 클릭
+frame.bind("<Button-3>", right_click)   # 오른쪽 버튼 클릭
 frame.pack()
 
 root.mainloop()
