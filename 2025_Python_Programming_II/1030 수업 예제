@@ -1,0 +1,90 @@
+class Animal:
+    def __init__(self, name):
+        self.name = name
+        def speak(self):
+            return '알 수 없음'
+
+class Dog(Animal):
+    def speak(self):
+        return '멍멍!'
+
+class Cat(Animal):
+    def speak(self):
+        return '야옹!'
+
+animalList = [Dog('dog1'),
+        Dog('dog2'),
+        Cat('cat1')]
+
+
+
+for a in animalList:
+    print(a.name + ':' + a.speak())
+
+    class Car:
+    def __init__(self, speed):
+        self.speed = speed
+    
+    def setSpeed(self, speed):
+        self.speed = speed
+    def getDesc(self):
+        return "차량 = ("+str(self.speed) +")"
+
+class SportsCar(Car):
+    def __init__(self, speed, turbo):
+        super().__init__(speed)
+        self.turbo = turbo
+
+    def setTurbo(self, turbo):
+        self.turbo = turbo
+
+obj = SportsCar(100, True)
+print(obj, getDesc())
+print(obj.getDesc())
+obj.setTurbo(False)
+
+
+
+
+class Animal :
+    def __init__(self, name=""):
+        self.name = name
+    
+    def eat(self):
+        print("동물이 먹고 있습니다.")
+
+class Dog(Animal):
+    def __init__(self):
+        super().__init__()
+    def eat(self):
+        print("강아지가 먹고 있습니다.")
+
+d = Dog()
+d.eat()
+
+
+
+
+class Person:
+    def __init__ (self, name, number):
+        self.name = name
+        self.number = number
+
+
+class Student(Person):
+    UNDERGRADUATE = 0
+    POSTGRADUATE = 1
+
+
+def __init__(self, name, number, studentType):
+    super().__init__(name, number)
+    self.studentType = studentType
+    self.gpa = 0
+    self.classes = []
+
+
+def Enrollcourse (self, course):
+    self.classes.append(course)
+
+def __str__(self):
+    return "\n이름 = " + self.name + "\n주민번호 =" + self.number + '\n수강과목 = ', 
