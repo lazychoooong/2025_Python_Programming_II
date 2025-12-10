@@ -1,0 +1,686 @@
+문제 1. Sprite 기반 슈팅 게임 – 목숨 & GAME OVER & 재시작
+관련: 파이게임 Sprite/Group, 충돌, FPS, Player/Alien/Bullet 예제
+기본 제공 코드(pygame2~5.py 스타일)를 아래 조건대로 수정하라.
+(플레이어, 외계인 Alien 여러 개, 총알 Bullet, all_sprites, aliens, bullets 그룹 구조는 주어진 예제를 그대로 사용한다고 가정한다.)
+목숨 시스템 추가
+플레이어에 lives 속성(초기값 3)을 추가한다.
+외계인과 플레이어가 충돌하면(pygame.sprite.spritecollide 또는 colliderect 활용),
+lives를 1 감소시키고
+외계인을 다시 위쪽 랜덤 위치로 초기화한다.
+현재 목숨 수를 화면 왼쪽 위에 텍스트로 표시한다. 예 : "LIVES: 2".
+GAME OVER 처리
+lives가 0이 되면 게임 루프 안에서 더 이상 우주선/외계인/총알이 움직이지 않도록 하고
+화면 중앙에 "GAME OVER" 텍스트를 크게 표시한다.
+재시작 기능
+GAME OVER 상태에서 R 키를 누르면 게임이 초기 상태로 리셋되도록 구현한다.
+플레이어 위치와 lives(3), 점수(있다면 0), 외계인 위치들을 초기화한다.
+채점 포인트: Sprite 상속 구조 이해, 그룹 업데이트/그리기, 충돌 처리, 상태 변수(lives, game_over 플래그 등)로 게임 흐름 제어 능력.
+
+코드 :
+import pygame
+import random
+
+pygame.init()
+
+WIDTH, HEIGHT = 600, 400
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Sprite Game - Lives & Restart")
+
+clock = pygame.time.Clock()
+FONT = pygame.font.SysFont(None, 32)
+
+# ---- Sprite 클래스들 ----
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        # 임시로 파란 사각형 사용 (이미지 있으면 바꿔도 됨)
+        self.image = pygame.Surface((40, 40))
+        self.image.fill((0, 0, 255))
+        self.rect = self.image.get_rect()
+        self.rect.centerx = WIDTH // 2
+        self.rect.bottom = HEIGHT - 10
+        self.speed = 5
+        self.lives = 3
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            self.rect.x -= self.speed
+        if keys[pygame.K_RIGHT]:
+            self.rect.x += self.speed
+
+        # 화면 경계 체크
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > WIDTH:
+            self.rect.right = WIDTH
+
+
+class Alien(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill((0, 255, 0))
+        self.rect = self.image.get_rect()
+        self.reset()
+
+    def reset(self):
+        self.rect.x = random.randint(0, WIDTH - self.rect.width)
+        self.rect.y = random.randint(-100, -40)
+        self.speedy = random.randint(2, 5)
+
+    def update(self):
+        self.rect.y += self.speedy
+        if self.rect.top > HEIGHT:
+            self.reset()
+
+
+class Bullet(pygame.sprite.Sprite):
+    def __init__(self, x, y):
+        super().__init__()
+        self.image = pygame.Surface((5, 15))
+        self.image.fill((255, 255, 0))
+        self.rect = self.image.get_rect()
+        self.rect.centerx = x
+        self.rect.bottom = y
+        self.speedy = -7
+
+    def update(self):
+        self.rect.y += self.speedy
+        if self.rect.bottom < 0:
+            self.kill()
+
+
+def draw_text(surface, text, font, color, x, y):
+    img = font.render(text, True, color)
+    rect = img.get_rect()
+    rect.topleft = (x, y)
+    surface.blit(img, rect)
+
+
+def reset_game():
+    global all_sprites, aliens, bullets, player, game_over
+
+    all_sprites = pygame.sprite.Group()
+    aliens = pygame.sprite.Group()
+    bullets = pygame.sprite.Group()
+
+    player = Player()
+    all_sprites.add(player)
+
+    for _ in range(5):
+        alien = Alien()
+        all_sprites.add(alien)
+        aliens.add(alien)
+
+    game_over = False
+
+
+# 초기화
+reset_game()
+running = True
+
+while running:
+    clock.tick(60)
+
+    # ---- 이벤트 처리 ----
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        # SPACE로 총알 발사
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE and not game_over:
+                bullet = Bullet(player.rect.centerx, player.rect.top)
+                all_sprites.add(bullet)
+                bullets.add(bullet)
+
+            # R 키로 재시작
+            if event.key == pygame.K_r and game_over:
+                reset_game()
+
+    if not game_over:
+        # ---- 업데이트 ----
+        all_sprites.update()
+
+        # 플레이어와 Alien 충돌 -> 목숨 감소 + Alien 리셋
+        hits = pygame.sprite.spritecollide(player, aliens, False)
+        for alien in hits:
+            player.lives -= 1
+            alien.reset()
+            if player.lives <= 0:
+                game_over = True
+
+        # 총알과 Alien 충돌 -> Alien 리셋, 총알 제거
+        hits = pygame.sprite.groupcollide(aliens, bullets, False, True)
+        for alien in hits:
+            alien.reset()
+
+    # ---- 화면 그리기 ----
+    screen.fill((0, 0, 0))
+    all_sprites.draw(screen)
+
+    # 목숨 표시
+    draw_text(screen, f"LIVES: {player.lives}", FONT, (255, 255, 255), 10, 10)
+
+    if game_over:
+        # GAME OVER 텍스트
+        big_font = pygame.font.SysFont(None, 64)
+        game_over_img = big_font.render("GAME OVER", True, (255, 0, 0))
+        game_over_rect = game_over_img.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+        screen.blit(game_over_img, game_over_rect)
+
+        small_font = pygame.font.SysFont(None, 28)
+        restart_img = small_font.render("Press R to Restart", True, (255, 255, 255))
+        restart_rect = restart_img.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 50))
+        screen.blit(restart_img, restart_rect)
+
+    pygame.display.flip()
+
+pygame.quit()
+
+----------------------------------------------------------------
+
+문제 2. Sprite 여러 개 + 점수 & 코인/적 객체(난이도 중상)
+관련: Sprite 그룹 여러 개, Bullet/Alien, 충돌 처리 예제
+
+기본 Player/Alien 구조를 활용하여 코인(보상) 과 장애물(적) 을 추가하는 게임을 작성하라.
+클래스 설계
+Coin(pygame.sprite.Sprite)
+화면 위쪽에서 아래로 떨어지는 작은 원/이미지.
+화면 아래로 벗어나면 위쪽 랜덤 위치에서 다시 떨어지도록 한다.
+Enemy(pygame.sprite.Sprite)
+좌우로 움직이는 적(또는 대각선 이동).
+벽에 닿으면 방향을 반대로 바꾼다.
+그룹 구성
+coins 그룹, enemies 그룹을 생성하고, 각각 여러 개의 스프라이트를 추가한다.
+all_sprites 그룹에는 Player, Coin, Enemy 모두 포함한다.
+점수 시스템
+전역 또는 Game 클래스에 score 변수를 두고,
+플레이어와 코인이 충돌할 때마다(충돌 시 코인은 다시 위로 초기화) 점수를 +10 한다.
+플레이어와 Enemy가 충돌하면 점수를 -20 한다.
+현재 점수를 화면 오른쪽 위에 "Score: 30" 형태로 표시한다.
+사운드 추가
+코인을 먹었을 때, Enemy와 부딪혔을 때 각각 다른 사운드 효과를 재생한다.
+pygame.mixer를 사용하여 최소 2개의 효과음을 로드하고, 충돌 시 재생한다.
+채점 포인트: Sprite 상속/그룹 활용, 충돌 종류별로 서로 다른 동작·점수·사운드 처리, 이동 패턴 구현(위→아래, 좌↔우).
+
+코드 :
+import pygame
+import random
+
+pygame.init()
+WIDTH, HEIGHT = 600, 400
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Coin & Enemy Game")
+
+clock = pygame.time.Clock()
+FONT = pygame.font.SysFont(None, 32)
+
+# ---- 사운드 (파일명은 환경에 맞게 바꾸기!) ----
+try:
+    coin_sound = pygame.mixer.Sound("coin.wav")   # 코인 먹었을 때
+    hit_sound = pygame.mixer.Sound("hit.wav")     # 적과 충돌
+except pygame.error:
+    coin_sound = None
+    hit_sound = None
+
+def play_sound(snd):
+    if snd is not None:
+        snd.play()
+
+# ---- Sprite 클래스들 ----
+class Player(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((40, 40))
+        self.image.fill((0, 0, 255))
+        self.rect = self.image.get_rect()
+        self.rect.centerx = WIDTH // 2
+        self.rect.bottom = HEIGHT - 10
+        self.speed = 5
+
+    def update(self):
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_LEFT]:
+            self.rect.x -= self.speed
+        if keys[pygame.K_RIGHT]:
+            self.rect.x += self.speed
+
+        if self.rect.left < 0:
+            self.rect.left = 0
+        if self.rect.right > WIDTH:
+            self.rect.right = WIDTH
+
+
+class Coin(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((20, 20))
+        self.image.fill((255, 255, 0))
+        self.rect = self.image.get_rect()
+        self.reset()
+
+    def reset(self):
+        self.rect.x = random.randint(0, WIDTH - self.rect.width)
+        self.rect.y = random.randint(-150, -20)
+        self.speedy = random.randint(2, 5)
+
+    def update(self):
+        self.rect.y += self.speedy
+        if self.rect.top > HEIGHT:
+            self.reset()
+
+
+class Enemy(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((30, 30))
+        self.image.fill((255, 0, 0))
+        self.rect = self.image.get_rect()
+        self.rect.x = random.randint(0, WIDTH - self.rect.width)
+        self.rect.y = random.randint(50, 200)
+        self.speedx = random.choice([-3, -2, -1, 1, 2, 3])
+
+    def update(self):
+        self.rect.x += self.speedx
+        if self.rect.left < 0 or self.rect.right > WIDTH:
+            self.speedx *= -1
+
+
+def draw_text(surface, text, font, color, x, y):
+    img = font.render(text, True, color)
+    rect = img.get_rect()
+    rect.topleft = (x, y)
+    surface.blit(img, rect)
+
+
+# ---- 그룹 및 변수 ----
+all_sprites = pygame.sprite.Group()
+coins = pygame.sprite.Group()
+enemies = pygame.sprite.Group()
+
+player = Player()
+all_sprites.add(player)
+
+for _ in range(5):
+    c = Coin()
+    all_sprites.add(c)
+    coins.add(c)
+
+for _ in range(3):
+    e = Enemy()
+    all_sprites.add(e)
+    enemies.add(e)
+
+score = 0
+running = True
+
+while running:
+    clock.tick(60)
+
+    # 이벤트 처리
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+    # 업데이트
+    all_sprites.update()
+
+    # 플레이어-코인 충돌 (점수 +10, 코인 리셋, 사운드)
+    hits = pygame.sprite.spritecollide(player, coins, False)
+    for coin in hits:
+        score += 10
+        coin.reset()
+        play_sound(coin_sound)
+
+    # 플레이어-Enemy 충돌 (점수 -20, 사운드)
+    hits = pygame.sprite.spritecollide(player, enemies, False)
+    for enemy in hits:
+        score -= 20
+        play_sound(hit_sound)
+
+    # 그리기
+    screen.fill((0, 0, 0))
+    all_sprites.draw(screen)
+    draw_text(screen, f"Score: {score}", FONT, (255, 255, 255), WIDTH - 150, 10)
+
+    pygame.display.flip()
+
+pygame.quit()
+
+
+
+---------------------------------------------------------------
+문제 3. 상속 + 다형성 + Tkinter – 도형 정보 & 그리기 프로그램
+관련: Shape/Rectangle/Circle 상속 구조 + Tkinter Canvas, Radiobutton 예제
+아래 조건을 만족하는 도형 정보 표시 & 그리기 프로그램을 작성하라.
+클래스 구조
+class Shape:
+생성자에서 (x, y)를 초기화한다.
+area(), perimeter(), draw(canvas)는 추상 메서드(기본 구현에서 NotImplementedError 발생).
+class Rectangle(Shape):
+생성자에서 (x, y, w, h)를 받아 초기화한다.
+area()는 w*h, perimeter()는 2*(w+h) 반환.
+draw(canvas)는 create_rectangle()으로 사각형을 그린다.
+class Circle(Shape):
+생성자에서 (x, y, r)을 받아 초기화한다.
+area()는 πr², perimeter()는 2πr 반환. (math 모듈 사용 가능)
+draw(canvas)는 create_oval()로 원을 그린다.
+Tkinter UI
+창 제목: "도형 계산기", 크기: 320×240, 배경 흰색.
+위쪽에 Radiobutton 2개: "사각형", "원".
+가운데에 Canvas 위젯 하나.
+아래쪽에 "그리기" 버튼과 결과 Label 하나.
+"그리기" 버튼을 클릭하면
+Canvas를 지우고(delete("all")),
+선택된 도형 객체를 생성하여 draw(canvas)를 호출하고,
+하단 Label에 "면적=..., 둘레=..."를 표시한다.
+도형의 구체적인 좌표와 크기는 코드에서 고정 값으로 지정한다.
+채점 포인트: 상속(is-a), 메서드 오버라이딩, 동일한 인터페이스(draw, area, perimeter)로 다른 클래스들을 다형적으로 사용하는지, Tkinter와 객체 설계 연동.
+
+코드 : 
+import tkinter as tk
+import math
+
+# ---- 클래스 계층 ----
+class Shape:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    def area(self):
+        raise NotImplementedError("area() must be overridden")
+
+    def perimeter(self):
+        raise NotImplementedError("perimeter() must be overridden")
+
+    def draw(self, canvas):
+        raise NotImplementedError("draw() must be overridden")
+
+
+class Rectangle(Shape):
+    def __init__(self, x, y, w, h):
+        super().__init__(x, y)
+        self.w = w
+        self.h = h
+
+    def area(self):
+        return self.w * self.h
+
+    def perimeter(self):
+        return 2 * (self.w + self.h)
+
+    def draw(self, canvas):
+        # x, y를 왼쪽 위로 보고 사각형 그리기
+        canvas.create_rectangle(self.x, self.y,
+                                self.x + self.w, self.y + self.h,
+                                outline="blue", width=2)
+
+
+class Circle(Shape):
+    def __init__(self, x, y, r):
+        super().__init__(x, y)
+        self.r = r
+
+    def area(self):
+        return math.pi * self.r ** 2
+
+    def perimeter(self):
+        return 2 * math.pi * self.r
+
+    def draw(self, canvas):
+        canvas.create_oval(self.x - self.r, self.y - self.r,
+                           self.x + self.r, self.y + self.r,
+                           outline="red", width=2)
+
+# ---- Tkinter UI ----
+root = tk.Tk()
+root.title("도형 계산기")
+root.geometry("320x260")
+
+shape_var = tk.StringVar()
+shape_var.set("rect")  # 기본값
+
+frame_top = tk.Frame(root)
+frame_top.pack(pady=5)
+
+rb_rect = tk.Radiobutton(frame_top, text="사각형", variable=shape_var, value="rect")
+rb_circle = tk.Radiobutton(frame_top, text="원", variable=shape_var, value="circle")
+rb_rect.pack(side="left", padx=10)
+rb_circle.pack(side="left", padx=10)
+
+canvas = tk.Canvas(root, width=300, height=140, bg="white")
+canvas.pack(pady=5)
+
+frame_bottom = tk.Frame(root)
+frame_bottom.pack(pady=5)
+
+result_label = tk.Label(root, text="면적, 둘레가 여기에 표시됩니다.")
+result_label.pack(pady=5)
+
+def draw_shape():
+    canvas.delete("all")
+
+    if shape_var.get() == "rect":
+        # 예: x=50, y=40, w=120, h=70
+        shape = Rectangle(50, 40, 120, 70)
+    else:
+        # 예: 중심 (150, 70), 반지름 50
+        shape = Circle(150, 70, 50)
+
+    shape.draw(canvas)
+    a = shape.area()
+    p = shape.perimeter()
+    result_label.config(text=f"면적 = {a:.2f}, 둘레 = {p:.2f}")
+
+btn_draw = tk.Button(frame_bottom, text="그리기", command=draw_shape)
+btn_draw.pack()
+
+root.mainloop()
+
+
+
+---------------------------------------------------------------
+문제 4. Book/도서 대출 관리 – 클래스 + Tkinter 연동 (난이도 중)
+관련: Book 클래스 + Tkinter 도서 대출 예제
+다음 요구사항을 만족하는 도서 대출 관리 프로그램을 작성하라.
+Book 클래스
+멤버 변수: title, author, borrowed(기본값 False).
+borrow()
+아직 대출되지 않았다면 borrowed=True로 바꾸고
+"○○이(가) 대출되었습니다." 문자열을 반환한다.
+이미 대출 중이면 "○○은(는) 이미 대출 중입니다." 문자열 반환.
+return_book()
+대출 중이면 borrowed=False로 바꾸고
+"○○이(가) 반납되었습니다." 문자열 반환.
+대출되지 않은 도서라면 "○○은(는) 대출되지 않은 상태입니다." 문자열 반환.
+Tkinter UI
+창 제목: "도서 대출 관리 시스템".
+Entry 2개: 제목, 저자 입력.
+버튼 2개: "대출", "반납".
+하단 Label 2개:
+첫 번째 Label: 가장 최근 메시지를 표시.
+두 번째 Label: 현재 대출 중인 책들의 목록을 "대출 목록: ..." 형식으로 표시.
+borrowed_books라는 전역 리스트에 대출 중인 Book 객체를 저장하고,
+대출/반납 후 항상 목록 Label 내용을 갱신한다.
+제목 또는 저자가 비어 있으면, 빨간색 메시지 "제목과 저자를 모두 입력하세요." 를 표시하고 아무 처리도 하지 않는다.
+채점 포인트: 클래스 설계, 문자열 반환과 GUI Label 연동, 리스트를 통한 상태 관리, 기본적인 입력 검증.
+
+
+코드 :
+import tkinter as tk
+
+class Book:
+    def __init__(self, title, author):
+        self.title = title
+        self.author = author
+        self.borrowed = False
+
+    def borrow(self):
+        if not self.borrowed:
+            self.borrowed = True
+            return f"'{self.title}' 이(가) 대출되었습니다."
+        else:
+            return f"'{self.title}' 은(는) 이미 대출 중입니다."
+
+    def return_book(self):
+        if self.borrowed:
+            self.borrowed = False
+            return f"'{self.title}' 이(가) 반납되었습니다."
+        else:
+            return f"'{self.title}' 은(는) 대출되지 않은 상태입니다."
+
+
+# ---- Tkinter UI ----
+root = tk.Tk()
+root.title("도서 대출 관리 시스템")
+root.geometry("380x230")
+
+borrowed_books = []  # 현재 대출 중인 Book 객체들
+
+# 입력 영역
+frame_input = tk.Frame(root)
+frame_input.pack(pady=5)
+
+tk.Label(frame_input, text="제목:").grid(row=0, column=0, padx=5, pady=2, sticky="e")
+tk.Label(frame_input, text="저자:").grid(row=1, column=0, padx=5, pady=2, sticky="e")
+
+entry_title = tk.Entry(frame_input, width=25)
+entry_author = tk.Entry(frame_input, width=25)
+entry_title.grid(row=0, column=1, pady=2)
+entry_author.grid(row=1, column=1, pady=2)
+
+# 메시지 Label
+msg_label = tk.Label(root, text="", fg="black")
+msg_label.pack(pady=5)
+
+# 대출 목록 Label
+list_label = tk.Label(root, text="대출 목록: 없음")
+list_label.pack(pady=5)
+
+def update_list_label():
+    if borrowed_books:
+        titles = [b.title for b in borrowed_books if b.borrowed]
+        if titles:
+            text = "대출 목록: " + ", ".join(titles)
+        else:
+            text = "대출 목록: 없음"
+    else:
+        text = "대출 목록: 없음"
+    list_label.config(text=text)
+
+def find_book(title, author):
+    for b in borrowed_books:
+        if b.title == title and b.author == author:
+            return b
+    return None
+
+def on_borrow():
+    title = entry_title.get().strip()
+    author = entry_author.get().strip()
+
+    if not title or not author:
+        msg_label.config(text="제목과 저자를 모두 입력하세요.", fg="red")
+        return
+
+    # 이미 목록에 있는지 확인
+    book = find_book(title, author)
+    if book is None:
+        book = Book(title, author)
+        borrowed_books.append(book)
+
+    msg = book.borrow()
+    # borrow() 호출 후 borrowed가 True인 경우만 대출 목록에 남는 구조
+    msg_label.config(text=msg, fg="black")
+    update_list_label()
+
+def on_return():
+    title = entry_title.get().strip()
+    author = entry_author.get().strip()
+
+    if not title or not author:
+        msg_label.config(text="제목과 저자를 모두 입력하세요.", fg="red")
+        return
+
+    book = find_book(title, author)
+    if book is None:
+        # 아직 한 번도 등장하지 않은 책
+        book = Book(title, author)
+        borrowed_books.append(book)
+
+    msg = book.return_book()
+    msg_label.config(text=msg, fg="black")
+    update_list_label()
+
+# 버튼들
+frame_btn = tk.Frame(root)
+frame_btn.pack(pady=5)
+
+btn_borrow = tk.Button(frame_btn, text="대출", width=10, command=on_borrow)
+btn_return = tk.Button(frame_btn, text="반납", width=10, command=on_return)
+btn_borrow.grid(row=0, column=0, padx=10)
+btn_return.grid(row=0, column=1, padx=10)
+
+root.mainloop()
+
+
+---------------------------------------------------------------
+
+문제 5. 간단 클래스 문제(점수 주기용) – 환율 계산기 클래스
+관련: ExchangeRate 클래스 연습 문제
+클래스와 tkinter-과제 (1)
+다음 조건을 만족하는 ExchangeRate 클래스를 작성하고, 제시된 코드를 실행했을 때 예시처럼 동작하도록 하라.
+클래스 설계
+멤버 변수: currency(통화명, 예: "USD"), rate(환율, 예: 1440).
+생성자에서 두 값을 초기화한다.
+메서드:
+to_won(amount) : 달러 금액 amount를 원화로 변환하여 반환
+(공식: 원화 = amount * rate)
+to_dollar(amount) : 원화 금액을 달러로 변환해 반환
+(공식: 달러 = amount / rate)
+update_rate(new_rate) : rate를 새 값으로 바꾸고
+"USD 환율이 1500원으로 변경됨" 같은 형식으로 출력.
+info() : "통화: USD, 현재 환율: 1440원" 형식의 문자열 출력.
+테스트 코드 (시험지에 제공)
+
+usd = ExchangeRate("USD", 1440)
+usd.info()
+print("100달러 =", usd.to_won(100), "원")
+print("270000원 =", round(usd.to_dollar(270000), 2), "달러")
+usd.update_rate(1500)
+print("100달러 =", usd.to_won(100), "원")
+
+위 코드를 실행했을 때, 환율 변경 전·후 결과가 올바르게 나오도록 클래스를 작성한다.
+채점 포인트: 생성자, 인스턴스 변수 사용, 단순 산술 연산, 메서드 정의 형식과 self 활용.
+
+코드 : 
+class ExchangeRate:
+    def __init__(self, currency, rate):
+        self.currency = currency
+        self.rate = rate  # 1 단위당 원화 환율
+
+    def to_won(self, amount):
+        # 달러 단위 -> 원화
+        return amount * self.rate
+
+    def to_dollar(self, amount):
+        # 원화 -> 달러 단위
+        return amount / self.rate
+
+    def update_rate(self, new_rate):
+        self.rate = new_rate
+        print(f"{self.currency} 환율이 {new_rate}원으로 변경됨")
+
+    def info(self):
+        print(f"통화: {self.currency}, 현재 환율: {self.rate}원")
+
+
+# ---- 테스트 코드 (시험지에 제공된다고 가정) ----
+if __name__ == "__main__":
+    usd = ExchangeRate("USD", 1440)
+    usd.info()
+    print("100달러 =", usd.to_won(100), "원")
+    print("270000원 =", round(usd.to_dollar(270000), 2), "달러")
+    usd.update_rate(1500)
+    print("100달러 =", usd.to_won(100), "원")
